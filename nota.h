@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include "tramo.h"
 
-#define MAX_PARAMS		2
+#define MAX_PARAMS	2
 #define REL_FREC_INDEX	0
 #define REL_AMP_INDEX	1
 #define MAX_FREC_DIGITS	1
@@ -14,7 +14,7 @@
 #define PARAMS_LENGTH	25
 
 #define LINE_DELIMITER	" "
-#define NUL_STR			""
+#define NUL_STR		""
 
 
 typedef struct {
