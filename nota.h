@@ -1,49 +1,51 @@
+/*TDA nota
+Contiene información sobre una nota musical dentro de una pista de audio.
+Sus atributos guardan:
+	el nombre de la nota en cifrado americano
+	la octava que le corresponde
+	su frecuencia fundamental
+	su intensidad
+	el momento en el cual inicia dentro de la pista
+	la duración en tiempo de la nota hasta que inicia su decaimiento
+*/
+
+#ifndef NOTA_H
+#define NOTA_H
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include "tramo.h"
+#include <math.h>
+#include "midi.h"
 
-#define MAX_PARAMS	2
-#define REL_FREC_INDEX	0
-#define REL_AMP_INDEX	1
+#define MAX_PARAMS		2
+#define FREC_INDEX		0
+#define AMP_INDEX		1
 #define MAX_FREC_DIGITS	1
 #define MAX_AMP_DIGITS	8
 #define HARM_STR_LENGTH	11
 #define PARAMS_LENGTH	25
+#define A4_FREC			440
+#define A4_OCT			4
 
 #define LINE_DELIMITER	" "
-#define NUL_STR		""
+#define NUL_STR			""
 
 
 typedef struct {
-	tramo_t * onda;
-	float armonicos[8][2];
-	int cantidad_armonicos;
-	char * parametros[3];	//arreglo de cadenas que indican [0]Ataque, [1]Sustain y [2] Dec con sus respectivos parámetros 
+	notas_t simbolo;
+	signed char octava;
+	float f;
+	float a;
+	double inicio;
+	double duracion;
 }nota_t;
 
 
+nota_t *crear_nota(notas_t simb, signed char oct, uint8_t i, double t0);
 
-nota_t* crear_nota();
-
-bool obtener_cantidad_armonicos(FILE *f, nota_t *nota);
-	/*Lee y guarda la primera línea de un archivo sintetizador, que indica cuántos armónicos modulan al timbre*/
-
-bool obtener_armonicos(FILE*  f, nota_t* nota);
-	/*Obtiene de un archivo de sintetizador la cantidad de armónicos de un determinado timbre de una nota dada 
-	y las frecuencias e intensidades relativas a las fundamentales de dicha nota.*/
-
-bool obtener_parametros_modular(FILE *f, nota_t *nota);
-
-void imprimir_cantidad_armonicos(nota_t * nota);
-
-void imprimir_armonicos(nota_t * nota);
-
-void imprimir_parametros(nota_t *nota);
-
-void destruir_parametros(nota_t *nota);
-
+void imprimir_nota(nota_t *nota);
 
 #endif
