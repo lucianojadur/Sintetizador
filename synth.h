@@ -26,16 +26,16 @@ TDA SINTETIZADOR
 #include "nota.h"
 #include "tramo.h"
 
-#define MAX_HARM			10
+#define MAX_HARM		10
 #define MAX_KEYS_LENGTH		9
 #define PARAM_LINES_NUMBER	3
 #define HARM_STR_LENGTH		11
-#define FREC_INDEX			0
-#define AMP_INDEX			1
+#define FREC_INDEX		0
+#define AMP_INDEX		1
 #define MAX_FREC_DIGITS		1
 #define MAX_AMP_DIGITS		8
 #define PARAMS_LENGTH		25
-#define FUNCTIONS			12
+#define FUNCTIONS		12
 #define MAX_MOD_FUNC		14
 #define LINE_DELIMITER		" "
 
