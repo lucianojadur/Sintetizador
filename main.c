@@ -140,7 +140,7 @@ int main(int argc, char const *argv[]){
 					        liberar(s, nota, tramo, fmidi, args);
 					        return -1;
 			        	}
-			        	tramo_destruir(tramo_nota);
+			        	tramo_destruir(tramo_nota); 
 						printf("Cantidad de muestras parcial: %lu\n\n", tramo->n);
 						nota_borrar(nota);
 						nota = NULL;
