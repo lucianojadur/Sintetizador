@@ -7,16 +7,16 @@ numéricos que representan las muestras discretas de una pista de audio.*/
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-
+#include "tramo.h"
 
 
 FILE* crear_fichero(const char *nombre);
 /*Crea un archivo de salida en modo escritura con el nombre recibido como parámetro.*/
 
-bool escribir_encabezado_wave(FILE *f, size_t n, int f_m);
+bool escribir_encabezado_wave(FILE *f, tramo_t *tramo);
 /*Escribe sobre un archivo el encabezado para un archivo de tipo WAVE con determinadas especificaciones.*/
 
-bool volcar_muestras(FILE *f, float v[], size_t n);
+bool volcar_muestras(FILE *f, tramo_t *tramo);
 /*Recbie un arreglo de flotantes y los escala a enteros de 16 bits signados para luego volcarlos como información
 en el archivo apuntado por f.*/
 
