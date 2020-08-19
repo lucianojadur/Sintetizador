@@ -6,11 +6,14 @@ LDFLAGS=-lm
 
 all:$(PROGRAM)
 
-$(PROGRAM): main.o sintetizador.o tramo.o nota.o midi.o muestreo.o wave.o argumentos.o
-	$(CC) $(CFLAGS) -o $(PROGRAM) main.o sintetizador.o tramo.o nota.o midi.o muestreo.o wave.o argumentos.o $(LDFLAGS) 
+$(PROGRAM): main.o sintetizador.o tramo.o nota.o midi.o muestreo.o wave.o _main.o
+	$(CC) $(CFLAGS) -o $(PROGRAM) main.o sintetizador.o tramo.o nota.o midi.o muestreo.o wave.o _main.o $(LDFLAGS) 
 
-main.o: main.c sintetizador.h nota.h tramo.h wave.h argumentos.h
+main.o: main.c sintetizador.h nota.h tramo.h wave.h _main.h 
 	$(CC) $(CFLAGS) -c main.c
+
+_main.o: _main.c _main.h sintetizador.h nota.h tramo.h wave.h _main.h 
+	$(CC) $(CFLAGS) -c _main.c
 
 sintetizador.o: sintetizador.c sintetizador.h nota.h tramo.h
 	$(CC) $(CFLAGS) -c sintetizador.c
@@ -29,9 +32,6 @@ midi.o: midi.c midi.h
 
 wave.o: wave.c wave.h
 	$(CC) $(CFLAGS) -c wave.c
-
-argumentos.o: argumentos.c argumentos.h
-	$(CC) $(CFLAGS) -c argumentos.c
 
 
 clean:
