@@ -26,7 +26,6 @@ TDA SINTETIZADOR
 #include "nota.h"
 #include "tramo.h"
 
-#define FLOATING_POINT_CHAR '.'
 #define MAX_HARM			10
 #define MAX_KEYS_LENGTH		9
 #define PARAM_LINES_NUMBER	3
@@ -38,8 +37,7 @@ TDA SINTETIZADOR
 #define PARAMS_LENGTH		25
 #define FUNCTIONS			12
 #define MAX_MOD_FUNC		14
-#define LINE_DELIMITER	" "
-#define NUL_STR			""
+#define LINE_DELIMITER		" "
 
 typedef float (*accion_t)(double, float [3]);
 
@@ -64,7 +62,6 @@ typedef enum {
 
 typedef struct {
 	char* clave;
-	//float (*accion)(double, float*);	
 	accion_t accion;
 }funciones_t;
 
@@ -75,8 +72,8 @@ typedef struct{
 
 typedef struct{
 	size_t n;
-	float armonicos[10][2];
 	params_t *data[3];
+	float armonicos[][2];
 }synth_t;
 
 
@@ -87,27 +84,10 @@ synth_t *sintetizador_crear(FILE *f);
 params_t *obtener_informacion(char * linea);
 /*Almacena en una estructura el nombre de la función que modula y los parámetros temporales escritos en linea*/
 
-bool obtener_cantidad_armonicos(FILE *f, size_t *n);
-/*Guada en n la cantidad de armónicos indicada en el archivo apuntado por f*/
-
-bool obtener_armonicos(FILE *f, float v[][2], size_t n);
-/*Guarda en v los valores de frecuencia y amplitud relativas a la fundamental de hasta n armónicos contenidos en 
-el archivo apuntado por f*/
-
-bool obtener_lineas_parametros(FILE *f, char* lineas[], const size_t cantidad_lineas);
-/*Guarda en un arreglo (lineas) las últimas 3 líneas del archivo f*/
-
-void obtener_clave(char* linea, char* clave);
-/*Guarda en clave la cadena alfabética de linea*/
-
-void obtener_valores_parametros(char* linea, float v[3]);
-/*Guarda en v hasta 3 valores flotantes que pueden estar contenidos en linea*/
-
 void imprimir_data(synth_t *s);
 
 void destruir_sintetizador(synth_t *t);
 /*Libera toda la memoria pedida para crear el tda*/
-
 
 tramo_t *sintetizar_nota(nota_t *nota, synth_t *s, int f_m);
 /*Crea un tramo con los primeros 4 parámetros muestreado a una frecuencia de muestreo f_m 
