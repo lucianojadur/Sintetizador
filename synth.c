@@ -31,16 +31,16 @@ static bool _obtener_datos_armonico(char * linea, float * f, float * a);
 static bool _hallar_operaciones(accion_t f[], size_t n, synth_t *s, const funciones_t funciones[]);
 //Guarda en funciones[] las 3 funciones que modulan cada intervalo de la onda de una nota.
 
-static tramo_t *_modular_intervalo(nota_t* nota, size_t inicio, double duracion, int f_m, synth_t *s, intervalo_t in, accion_t accion);
-/*crea un tramo de muestras de cierto intervalo de duración de una nota musical a partir de su índice de inicio hasta su duración, 
-a una frecuencia de muestreo f_m, sintetizado por la función acción según los parámetros guardados en el sintetizador s*/
+static bool _modular(tramo_t *t, double t_a, double t_s, double t_d, int f_m, synth_t *s, accion_t acciones[]);
+/*Modula un tramo de muestras de una señal según las funciones recibidas en el vector acciones, las cuales cada
+una corresponde a un intervalo de la envolvente, determinados sus límites por t_a, d y t_s*/
 
 static void _imprimir_parametros(params_t *p);
 
 
 static float _constant(double t, float params[3]) { return 1; }
 static float _linear(double t, float params[3])	{ return t/params[0]; }
-static float _invlinear(double t, float params[3]) { return 1 - t/(float)params[0];}
+static float _invlinear(double t, float params[3]) { return (1 - t/(float)params[0]) > 0 ? 1 - t/(float)params[0] : 0;}
 static float _sin(double t, float params[3]) { return 1 + params[1] * sin(params[2] * t); }
 static float _exp(double t, float params[3]) { return exp((5 * (t - params[0])) / params[0]); }
 static float _invexp(double t, float params[3]) { return exp((-5 * t) / params[0]); }
@@ -58,7 +58,11 @@ static float _tri(double t, float params[3]) {
 	return 1;
 }
 static float _pulses(double t, float params[3]){
-	return 1;
+	float t0 =  params[0], t1 = params[1], a = params[2];
+	float taux = t0 * (t/ t0 - (int)(t/t0));
+	float res = a + ((1-a)/t1) * (taux - t0 + t1);
+
+	return res < 1 ? res : 1;
 }
 
 static const funciones_t funciones[] = {	
@@ -110,42 +114,24 @@ void destruir_sintetizador(synth_t *s){
 	free(s);
 }
 
-
-tramo_t *sintetizar_nota(nota_t *nota, synth_t *s, int f_m){
+tramo_t *sintetizar_nota(nota_t *n, synth_t *s, int f_m){
 	accion_t operaciones[3];
 	if(! _hallar_operaciones(operaciones, 3, s, funciones))
 		return NULL;
 
 	double t_a = s->data[ATAQUE]->instantes[0];
-	double t_s = nota->duracion - t_a - nota->inicio;
+	double duracion = n->final - n->inicio;
 	double t_d = s->data[CAIDA]->instantes[0];
-//ATAQUE
-	tramo_t *nota_tramo = _modular_intervalo(nota, 0, t_a, f_m, s, ATAQUE, operaciones[ATAQUE]);
-	if(nota_tramo == NULL)
+
+	tramo_t *nota_tramo = tramo_crear_muestreo(n->inicio, n->final + t_d, f_m, n->f, n->a, s->armonicos, s->n);
+	if (nota_tramo == NULL)
 		return NULL;
-//SUSTAIN
-	tramo_t *sus_tramo = _modular_intervalo(nota, nota_tramo->n, t_s, f_m, s, SUSTAIN, operaciones[SUSTAIN]);
-	if(sus_tramo == NULL){
+	if (!_modular(nota_tramo, t_a, duracion, t_d, f_m, s, operaciones)){
 		tramo_destruir(nota_tramo);
 		return NULL;
 	}
-	if(!tramo_extender(nota_tramo, sus_tramo)){
-		tramo_destruir(sus_tramo);
-		return NULL;
-	}tramo_destruir(sus_tramo);
-//CAIDA
-	tramo_t *dec_tramo = _modular_intervalo(nota, nota_tramo->n, t_d, f_m, s, CAIDA, operaciones[CAIDA]);
-	if(dec_tramo == NULL){
-		tramo_destruir(nota_tramo);
-		return NULL;
-	}if(!tramo_extender(nota_tramo, dec_tramo)){
-		tramo_destruir(dec_tramo);
-		return NULL;
-	}tramo_destruir(dec_tramo);
-
 	return nota_tramo;
 }
-
 
 void imprimir_data(synth_t *s){
 	printf("Cantidad de armónicos: %lu\n", s->n);
@@ -163,10 +149,10 @@ static params_t *_obtener_informacion(char* linea){
 	params_t *data = malloc(sizeof(params_t)+1);
 	if(data == NULL)return NULL;
 
-	char nombre_funcion[MAX_KEYS_LENGTH+1];	//data->clave
+	char nombre_funcion[MAX_KEYS_LENGTH+1];	
 	_obtener_clave(linea, nombre_funcion);
 
-	float v[3] = {0,0,0};								//data->instantes
+	float v[3] = {0,0,0};								
 	_obtener_valores_parametros(linea, v);
 	strcpy(data->clave, nombre_funcion);
 	for (size_t i = 0; i < 3; i++){
@@ -206,7 +192,7 @@ static bool _obtener_lineas_parametros(FILE *f, char *lineas[], const size_t can
 		if((data = _leer_linea(f, PARAMS_LENGTH)) == NULL)
 			return false;
 		free(data);
-	}	//cuando data[0] es alfabético, salgo del while y ya data = primer parámetro
+	}	
 	for (size_t i = 0; i < cantidad_lineas; i++){
 		if (isalpha(data[0]) == 0 || data == NULL){
 			free(data);
@@ -237,11 +223,11 @@ static void _obtener_valores_parametros(char* linea, float v[3]){
 	while(linea[c] != '\0'){
 
 		if (isdigit(linea[c]) > 0 || linea[c] == '.'){
-			aux = c;	//copio la direccion apuntada por c
-			aux++;		//avanzo desde la copia	
+			aux = c;	
+			aux++;		
 			while(linea[aux] != '\0'){
-				if(linea[aux] == ' ' || linea[aux] == '\n') break;//dejo de avanzar cuando termina el numero
-				aux++;	//avanzo desde la copia
+				if(linea[aux] == ' ' || linea[aux] == '\n') break;
+				aux++;	
 			}
 			memcpy(temp, &linea[c], aux - c);
 			v[i] = strtof(temp, NULL);
@@ -287,15 +273,26 @@ static bool _hallar_operaciones(accion_t f[], size_t n, synth_t *s, const funcio
 	return true;
 }
 
-static tramo_t *_modular_intervalo(nota_t* nota, size_t i_inicio, double duracion, int f_m, synth_t *s, intervalo_t in, accion_t accion){
-	double t0_intervalo = nota->inicio + (double)i_inicio / f_m;
-	tramo_t *intervalo = tramo_crear_muestreo(t0_intervalo, t0_intervalo + duracion, f_m, nota->f, nota->a, s->armonicos, s->n);
-	if(intervalo == NULL)
-		return NULL;
+static bool _modular(tramo_t *t, double t_a, double d, double t_d, int f_m, synth_t *s, accion_t acciones[]){
+	accion_t ataque = acciones[ATAQUE];
+	accion_t sustain = acciones[SUSTAIN];
+	accion_t caida = acciones[CAIDA];
 
-	for(size_t i = 0; i < intervalo->n; i++)
-		intervalo->v[i] *= accion((double)i/f_m, s->data[in]->instantes);
-	return intervalo;	
+	if (t == NULL) return false;
+	for (size_t i = 1; i < t->n; i++){
+
+		if ((float)i/f_m < t_a)
+			t->v[i] *= ataque((double)i/f_m, s->data[ATAQUE]->instantes);
+		
+		else if ((float)i/f_m > t_a && (float)i/f_m < d)
+			t->v[i] *= sustain((double)i/f_m - t_a, s->data[SUSTAIN]->instantes);
+		
+		else if ((float)i/f_m > d){
+			t->v[i] *= sustain(t->t0 + d, s->data[SUSTAIN]->instantes);
+			t->v[i] *= caida((double)i/f_m - d, s->data[CAIDA]->instantes);
+		}
+	}
+	return true;
 }
 
 static void _imprimir_parametros(params_t *p){
