@@ -5,8 +5,6 @@
 
 static float _max(float v[], size_t i);
 /*Recibe un vector -no necesariamente ordenado- y devuelve el mayor elemento*/
-static int comparar(const void *a, const void *b);
-/*Compara a y b y devuelve un número mayor, igual o menor a 0 según el valor de a respecto de b respectivamente*/
 
 
 FILE* crear_fichero(const char *nombre){
@@ -68,17 +66,11 @@ bool volcar_muestras(FILE *f, tramo_t* tramo){
 
 
 static float _max(float v[], size_t n){
-	float *aux = malloc(sizeof(float) * n);
-	if (aux == NULL) return 0;
-	memcpy(aux, v, n);
-	qsort(aux, n, sizeof(float), &comparar);
-	float max = aux[n-1];
-	free(aux);
+	float max = v[0];
+	for (size_t i = 1; i < n; i++){
+		if (v[i] > max)
+			max = v[i];
+	}
 	return max;
 }
 
-static int comparar(const void *a, const void *b){
-	if(*(float *)a > *(float *)b) return 1;
-	else if(*(float *)a < *(float *)b) return -1;
-	return 0;
-}
