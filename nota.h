@@ -21,6 +21,7 @@ Sus atributos guardan:
 #include "midi.h"
 
 #define MAX_PARAMS		2
+#define MAX_NOTAS		12
 #define FREC_INDEX		0
 #define AMP_INDEX		1
 #define MAX_FREC_DIGITS	1
@@ -40,12 +41,26 @@ typedef struct {
 	float f;
 	float a;
 	double inicio;
-	double duracion;
+	double final;
 }nota_t;
+
 
 
 nota_t *crear_nota(notas_t simb, signed char oct, uint8_t i, double t0);
 
+bool aumentar_duracion(nota_t *n, float t);
+
+bool nota_ya_existe(notas_t nombre, signed char oct, nota_t *notas[], size_t n, size_t *pos);
+
+size_t hallar_posicion(notas_t nombre, signed char oct, nota_t *notas[], size_t n);
+
+size_t posicion_nota_nueva(nota_t *notas[], size_t n);
+
 void imprimir_nota(nota_t *nota);
+
+void nota_borrar(nota_t *n);
+
+void actualizar_lista(nota_t *notas[]);
+
 
 #endif
