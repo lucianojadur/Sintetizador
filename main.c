@@ -15,7 +15,7 @@ int main(int argc, char const *argv[]){
 
 	if (!verificar_argumentos(argc, argv, args)){
 		uso(argv[0]);
-		borrar_argumentos(args);
+		free(args);
 		return -1;
 	}
 
@@ -35,8 +35,22 @@ int main(int argc, char const *argv[]){
 		return -1;
 	} imprimir_data(s);
 
+
+
+
+
+
 	tramo_t *tramo = _tramo_crear(0,0,f_m);
-	nota_t *nota = NULL;
+	nota_t *nota [MAX_NOTAS]; //= calloc(MAX_NOTAS, sizeof(nota_t*));
+	for (int i = 0; i < MAX_NOTAS; i++){
+		nota[i] = NULL;
+	}
+	size_t cantidad_notas = MAX_NOTAS;
+
+
+
+
+
 
 	// APERTURA DE ARCHIVO MIDI:
 	FILE *fmidi = fopen(args->midi, "rb");
@@ -54,7 +68,7 @@ int main(int argc, char const *argv[]){
 	    liberar(s, nota, tramo, fmidi, args);
 	    return 1;
 	}printf("Encabezado:\n\tFormato: %s\n\tNumero de pistas: %d\n\tPulsos por negra: %d\n", codificar_formato(formato), numero_pistas, pulsos_negra);
-	
+
 	// ITERAMOS LAS PISTAS:
 	for(uint16_t pista = 0; pista < numero_pistas; pista++) {
 		uint32_t tamagno_pista;
@@ -70,13 +84,12 @@ int main(int argc, char const *argv[]){
 		double inicio_nota = 0;
 		int longitud;
 
-		// ITERAMOS LAS PISTAS:
+		
 		while(1) {
 			uint32_t delta_tiempo;
 			leer_tiempo(fmidi, &delta_tiempo);
 			tiempo += delta_tiempo;
 			printf("[%d] ", tiempo);
-			
 
 			uint8_t buffer[EVENTO_MAX_LONG];
 			if(! leer_evento(fmidi, &evento, &canal, &longitud, buffer)) {
@@ -85,18 +98,18 @@ int main(int argc, char const *argv[]){
 			    return 1;
 			}
 			printf("Evento: %s, Canal: %d", codificar_evento(evento), canal);
-// PROCESAMIENTO DEL EVENTO:
+
+	// PROCESAMIENTO DEL EVENTO:
 			if(evento == METAEVENTO && canal == 0xF) {
 			    // METAEVENTO:
 			    if(buffer[METAEVENTO_TIPO] == METAEVENTO_FIN_DE_PISTA) {
-			        putchar('\n');
-			        printf("Final de la pista %d.\n", pista);
+			        printf("\nFinal de la pista %d.\n", pista);
 			        break;
 			    }
 				descartar_metaevento(fmidi, buffer[METAEVENTO_LONGITUD]);
 			}
 
-// PROCESAMIENTO DE LA NOTA:
+	// PROCESAMIENTO DE LA NOTA:
 			else if (evento == NOTA_ENCENDIDA || evento == NOTA_APAGADA) {   
 				notas_t n_simbolo;
 				signed char oct;
@@ -106,33 +119,46 @@ int main(int argc, char const *argv[]){
 			        fprintf(stderr, "Error leyendo nota\n");
 			        liberar(s, nota, tramo, fmidi, args);
 			        return -1;
-			    } printf(", Nota: %s, Octava: %d, Velocidad: %d\n", codificar_nota(n_simbolo), oct, buffer[EVNOTA_VELOCIDAD]);
-				
+			    }
+				printf(", Nota: %s, Octava: %d, Velocidad: %d\n", codificar_nota(n_simbolo), oct, buffer[EVNOTA_VELOCIDAD]);
 
+
+
+		//FILTRO EL CANAL
 				if (canal == cnl){
-				
+
+					size_t i = 0;
+					while(nota[i] != NULL && i < MAX_NOTAS){
+						if (nota[i]->octava > 8) break;
+						aumentar_duracion(nota[i], (double)delta_tiempo / pps);
+						i++;
+					} //Salgo cuando i == NULL (o sea, no hay ninguna nota en ese lugar del arreglo)
+
 					if (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] != 0){
-						if(nota == NULL){
-		/*CREO LA NOTA*/	nota = crear_nota(n_simbolo, oct, buffer[EVNOTA_VELOCIDAD], inicio_nota);
-						    if (nota == NULL){
-						    	fprintf(stderr, "\nNo se pudo crear la nota en el tiempo [%d]\n\n", tiempo);
+						if(!nota_ya_existe(n_simbolo, oct, nota, cantidad_notas, &i)){
+		/*CREO LA NOTA*/	nota[i] = crear_nota(n_simbolo, oct, buffer[EVNOTA_VELOCIDAD], inicio_nota);
+						    if (nota[i] == NULL){
+						    	fprintf(stderr, "\nNo se pudo guardar la nota en el tiempo [%d]\n\n", tiempo);
 						    	liberar(s, nota, tramo, fmidi, args);
 						    	return -1;
 					    	}
-					    }else
-					    	nota->duracion += (double)delta_tiempo / pps;
-
-					}else if(evento == NOTA_APAGADA || (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] == 0)){
-						if (nota == NULL)
+					    }
+					}
+					else if(evento == NOTA_APAGADA || (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] == 0)){	
+				    	i = hallar_posicion(n_simbolo, oct, nota, cantidad_notas);
+						if (nota[i] == NULL)
 							continue;
-						aumentar_duracion(nota, (double)delta_tiempo / pps);
-						
-			    		imprimir_nota(nota);
+
+					//	printf("Posición: %lu\n", i);
+			    		imprimir_nota(nota[i]);
 						
 				//SÍNTESIS DE LA NOTA:
-						tramo_t *tramo_nota = sintetizar_nota(nota, s, f_m);
+						tramo_t *tramo_nota = sintetizar_nota(nota[i], s, f_m);
 						if(tramo_nota == NULL){
-							fprintf(stderr, "\n\n######\n #ERROR: No se pudo sintetizar la nota.\n######\n\n");
+							//fprintf(stderr, "\n\n######\n #ERROR: No se pudo sintetizar la nota.\n######\n\n");
+							nota_borrar(nota[i]);
+							nota[i] = NULL;
+							actualizar_lista(nota);
 							continue;
 						}
 						if(!tramo_extender(tramo, tramo_nota)){
@@ -141,12 +167,13 @@ int main(int argc, char const *argv[]){
 					        return -1;
 			        	}
 			        	tramo_destruir(tramo_nota); 
-						printf("Cantidad de muestras parcial: %lu\n\n", tramo->n);
-						nota_borrar(nota);
-						nota = NULL;
+					//	printf("Cantidad de muestras parcial: %lu\n\n", tramo->n);
+						nota_borrar(nota[i]);
+						nota[i] = NULL;
+						actualizar_lista(nota);
 					}
 				}
-			}
+			}//putchar('\n');
 		}
 
         
@@ -161,14 +188,15 @@ int main(int argc, char const *argv[]){
 	if (escribir_encabezado_wave(fw, tramo)){
 		if (!volcar_muestras(fw, tramo)){
 			fprintf(stderr, "\nNo se pudo escribir el archivo WAVE\n");
-			liberar(NULL, NULL, tramo, NULL, args);
+			liberar(NULL, nota, tramo, NULL, args);
 			return -1;
 		}
 	}
 	printf("\n\n\n### Se pudo escribir el wave :D ###\n");
-	borrar_argumentos(args);
+	free(args);
 	tramo_destruir(tramo);
 	fclose(fw);
 
 	return 0;
 }
+
