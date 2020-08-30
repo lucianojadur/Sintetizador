@@ -1,6 +1,5 @@
 #include "midi.h"
 
-
 const char * nombres_formatos[] = {
 	[PISTA_UNICA] = "Pista única",
 	[MULTIPISTA_SINCRONICA] = "Multipista sincrónica",
@@ -34,6 +33,100 @@ const char * lista_notas_sostenido[] = {
 };
 
 
+bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int pps){
+	// LECTURA DEL ENCABEZADO:
+	formato_t formato;
+	uint16_t numero_pistas;
+	uint16_t pulsos_negra;
+
+	if (! leer_encabezado(f, &formato, &numero_pistas, &pulsos_negra)) {
+		vaciar_contenedor_notas(notas, cantidad_notas);
+	    fclose(f);
+	    return 1;
+	}
+
+	// ITERAMOS LAS PISTAS:
+	for (uint16_t pista = 0; pista < numero_pistas; pista++) {
+	    // LECTURA ENCABEZADO DE LA PISTA:
+	    uint32_t tamagno_pista = 0;
+	    if (! leer_pista(f, &tamagno_pista)) {
+			vaciar_contenedor_notas(notas, cantidad_notas);
+	        fclose(f);
+	        return 1;
+	    }
+
+		evento_t evento;
+		char canal;
+		uint32_t tiempo = 0;
+		double inicio_nota = 0;
+		int longitud;
+		// ITERAMOS LOS EVENTOS:
+		while(1) {
+			uint32_t delta_tiempo;
+			leer_tiempo(f, &delta_tiempo);
+			tiempo += delta_tiempo;
+
+			// LECTURA DEL EVENTO:
+			uint8_t buffer[EVENTO_MAX_LONG];
+			if (! leer_evento(f, &evento, &canal, &longitud, buffer)) {
+				vaciar_contenedor_notas(notas, cantidad_notas);
+				fclose(f);
+				return false;
+			}
+
+			// METAEVENTO:
+			if (evento == METAEVENTO && canal == 0xF) {
+				if(buffer[METAEVENTO_TIPO] == METAEVENTO_FIN_DE_PISTA) 
+					break;
+			    descartar_metaevento(f, buffer[METAEVENTO_LONGITUD]);
+			}
+
+			if (canal == cnl){
+				size_t i = 0;
+
+				while(notas[i] != NULL && i < MAX_NOTAS){
+					if (!nota_finalizo(notas[i]))
+						aumentar_duracion(notas[i], (double)delta_tiempo / pps);
+					i++;
+				} 
+				if (evento == NOTA_ENCENDIDA || evento == NOTA_APAGADA) {   
+					notas_t n_simbolo;
+					signed char oct;
+					inicio_nota = (double)tiempo / pps;
+					if (! decodificar_nota(buffer[EVNOTA_NOTA], &n_simbolo, &oct))
+				        continue;
+				
+					if (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] != 0){
+						if (!nota_ya_existe(n_simbolo, oct, notas, cantidad_notas, &i)){
+		/*CREO LA NOTA*/	notas[i] = crear_nota(n_simbolo, oct, buffer[EVNOTA_VELOCIDAD], inicio_nota);
+						    if (notas[i] == NULL){
+						    	fprintf(stderr, "No se pudo guardar la nota de la posicion [%lu]\n", i);
+						    	continue;
+						    }
+					    }
+					    if (!nota_finalizo(notas[i]))
+					    	continue;
+					}
+					else if (evento == NOTA_APAGADA || (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] == 0)){
+				    	i = hallar_posicion(n_simbolo, oct, notas, cantidad_notas);
+				    	printf("posicion: %lu\n", i);
+				    	if (i  == -1) continue;
+				    	if (notas[i] == NULL){
+				    		fprintf(stderr, "la nota de la posicion [%lu] es NULL \n", i);
+							continue;
+				    	}
+
+						if (!nota_finalizo(notas[i]))
+							nota_terminar(notas[i]);
+					}			
+				}
+			}//if canal
+
+		}
+	}
+    printf("Procesamiento finalizado.\n\n");
+    return true;
+}
 
 //DECODIFICACIÓN
 
@@ -48,14 +141,7 @@ bool decodificar_formato(uint16_t valor, formato_t *formato){
 }
 
 
-bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud){
-	/*Dado el valor recibido guarda en el puntero a evento el evento que dicho valor representa; en el puntero a canal,
-	el canal que dicho valor representa; y en el puntero a longitud la longitud del evento.
-	El valor ingresado debe contener su MSB en estado alto, es decir, debe ser mayor a 127. De otro modo, la
-	palabra correspondiente al evento no será válida.
-	Si el valor no se corresponde con un evento válido devuelve false sin modificar ningún parámetro; si todo sale bien
-	devuevle true*/ 
-	
+bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud){	
 	if((valor & MSB_MASK_ON) == MSB_MASK_ON){
 		*evento = (valor & (~MSB_MASK_ON)) >> SHIFT_VALUE; 
 		*canal = (uint8_t)(valor << SHIFT_VALUE) >> SHIFT_VALUE;
@@ -70,7 +156,6 @@ bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longi
 bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava){
 	/*Dado el valor recibido guarda en nota la nota representada por dicho valor y en el puntero octava
 	guarda la octava correspondiente. Si la nota es correcta devueve true, en caso contrario devuelve false*/
-
 	if(valor <= 127){
 		*nota = valor % 12;
 		*octava = (char)(valor / 12 - 1); //resto 1 porque los primeros 12 semitonos corresponden a la octava 0
@@ -104,7 +189,6 @@ const char *codificar_nota(notas_t nota){
 uint8_t leer_uint8_t(FILE *f){
 	uint8_t palabra;
 	fread(&palabra, sizeof(uint8_t), 1, f);
-	
 	return palabra;
 }
 
