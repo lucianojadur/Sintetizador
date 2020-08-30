@@ -13,15 +13,15 @@ Sus atributos guardan:
 #define NOTA_H
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
-#include "midi.h"
 
 #define MAX_PARAMS		2
-#define MAX_NOTAS		12
+#define MAX_NOTAS		10000
 #define FREC_INDEX		0
 #define AMP_INDEX		1
 #define MAX_FREC_DIGITS	1
@@ -34,6 +34,7 @@ Sus atributos guardan:
 #define LINE_DELIMITER	" "
 #define NUL_STR			""
 
+typedef enum { C, C_SHARP, D, D_SHARP, E, F, F_SHARP, G, G_SHARP, A, A_SHARP, B }notas_t;
 
 typedef struct {
 	notas_t simbolo;
@@ -42,6 +43,7 @@ typedef struct {
 	float a;
 	double inicio;
 	double final;
+	bool finalizada;
 }nota_t;
 
 
@@ -54,11 +56,15 @@ bool nota_ya_existe(notas_t nombre, signed char oct, nota_t *notas[], size_t n, 
 
 size_t hallar_posicion(notas_t nombre, signed char oct, nota_t *notas[], size_t n);
 
-size_t posicion_nota_nueva(nota_t *notas[], size_t n);
+bool nota_finalizo(nota_t *nota);
+
+void nota_terminar(nota_t *n);
 
 void imprimir_nota(nota_t *nota);
 
 void nota_borrar(nota_t *n);
+
+void vaciar_contenedor_notas(nota_t *notas[], size_t n);
 
 void actualizar_lista(nota_t *notas[]);
 
