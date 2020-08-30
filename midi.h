@@ -1,97 +1,275 @@
-#ifndef MIDI_H
-#define MIDI_H
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+#include "midi.h"
 
-#define MSB_MASK_ON		0x80
-#define HEADER_VALUE	0x4D546864
-#define TRACK_ID_VALUE	0x4D54726B
-#define MSB_MAX_TIME_ON	0x80000000
+const char * nombres_formatos[] = {
+	[PISTA_UNICA] = "Pista única",
+	[MULTIPISTA_SINCRONICA] = "Multipista sincrónica",
+	[MULTIPISTA_ASINCRONICA] = "Multipista asincrónica"
+};
 
-#define SHIFT_1_BIT			1
-#define SHIFT_1_BYTE 		8
-#define SHIFT_2_BYTES 		16
-#define SHIFT_3_BYTES 		24
-#define SHIFT_4_BYTES		32
-#define SHIFT_HEADER		8
-#define SHIFT_TRACK_ID		4		
-#define SHIFT_TRACK_SIZE	8
-#define SHIFT_VALUE			4
+prop_evento_t propiedades[] = {
+	{NOTA_APAGADA, "Nota apagada", 2},
+	{NOTA_ENCENDIDA, "Nota encendida", 2},
+	{NOTA_DURANTE, "Nota durante", 2},
+	{CAMBIO_CONTROL, "Cambio de control", 2},
+	{CAMBIO_PROGRAMA,"Cambio de programa", 1},
+	{VARIAR_CANAL,"Variar canal", 1},
+	{CAMBIO_TONO,"Cambio de tono", 2},
+	{METAEVENTO,"Metaevento", 2}
+};
 
-
-typedef enum {
-	PISTA_UNICA,
-	MULTIPISTA_SINCRONICA,
-	MULTIPISTA_ASINCRONICA
-}formato_t;
-
-typedef enum{
-	NOTA_APAGADA,
-	NOTA_ENCENDIDA,
-	NOTA_DURANTE,
-	CAMBIO_CONTROL,
-	CAMBIO_PROGRAMA,
-	VARIAR_CANAL,
-	CAMBIO_TONO,
-	METAEVENTO
-}evento_t;
-
-typedef enum{
-	C,
-	C_SHARP,
-	D,
-	D_SHARP,
-	E,
-	F,
-	F_SHARP,
-	G,
-	G_SHARP,
-	A,
-	A_SHARP,
-	B
-}notas_t;
-
-typedef struct{
-	evento_t evento;
-	char * tipo_evento;
-	int longitud;
-}prop_evento_t;
+const char * lista_notas_sostenido[] = {
+	[C] = "C",
+	[C_SHARP] = "C#",
+	[D] = "D",
+	[D_SHARP] = "D#",
+	[E] = "E",
+	[F] = "F",
+	[F_SHARP] = "F#",
+	[G] = "G",
+	[G_SHARP] = "G#",
+	[A] = "A",
+	[A_SHARP] = "A#",
+	[B] = "B",
+};
 
 
+bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int pps){
+	// LECTURA DEL ENCABEZADO:
+	formato_t formato;
+	uint16_t numero_pistas;
+	uint16_t pulsos_negra;
 
-bool decodificar_formato(uint16_t valor, formato_t *formato);
+	if (! leer_encabezado(f, &formato, &numero_pistas, &pulsos_negra)) {
+		vaciar_contenedor_notas(notas, cantidad_notas);
+	    fclose(f);
+	    return 1;
+	}
 
-bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud);
+	// ITERAMOS LAS PISTAS:
+	for (uint16_t pista = 0; pista < numero_pistas; pista++) {
+	    // LECTURA ENCABEZADO DE LA PISTA:
+	    uint32_t tamagno_pista = 0;
+	    if (! leer_pista(f, &tamagno_pista)) {
+			vaciar_contenedor_notas(notas, cantidad_notas);
+	        fclose(f);
+	        return 1;
+	    }
 
-bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava);
+		evento_t evento;
+		char canal;
+		uint32_t tiempo = 0;
+		double inicio_nota = 0;
+		int longitud;
+		// ITERAMOS LOS EVENTOS:
+		while(1) {
+			uint32_t delta_tiempo;
+			leer_tiempo(f, &delta_tiempo);
+			tiempo += delta_tiempo;
+
+			// LECTURA DEL EVENTO:
+			uint8_t buffer[EVENTO_MAX_LONG];
+			if (! leer_evento(f, &evento, &canal, &longitud, buffer)) {
+				vaciar_contenedor_notas(notas, cantidad_notas);
+				fclose(f);
+				return false;
+			}
+
+			// METAEVENTO:
+			if (evento == METAEVENTO && canal == 0xF) {
+				if(buffer[METAEVENTO_TIPO] == METAEVENTO_FIN_DE_PISTA) 
+					break;
+			    descartar_metaevento(f, buffer[METAEVENTO_LONGITUD]);
+			}
+
+			if (canal == cnl){
+				size_t i = 0;
+
+				while(notas[i] != NULL && i < MAX_NOTAS){
+					if (!nota_finalizo(notas[i]))
+						aumentar_duracion(notas[i], (double)delta_tiempo / pps);
+					i++;
+				} 
+				if (evento == NOTA_ENCENDIDA || evento == NOTA_APAGADA) {   
+					notas_t n_simbolo;
+					signed char oct;
+					inicio_nota = (double)tiempo / pps;
+					if (! decodificar_nota(buffer[EVNOTA_NOTA], &n_simbolo, &oct))
+				        continue;
+				
+					if (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] != 0){
+						if (!nota_ya_existe(n_simbolo, oct, notas, cantidad_notas, &i)){
+		/*CREO LA NOTA*/	notas[i] = crear_nota(n_simbolo, oct, buffer[EVNOTA_VELOCIDAD], inicio_nota);
+						    if (notas[i] == NULL){
+						    	fprintf(stderr, "No se pudo guardar la nota de la posicion [%lu]\n", i);
+						    	continue;
+						    }
+					    }
+					    if (!nota_finalizo(notas[i]))
+					    	continue;
+					}
+					else if (evento == NOTA_APAGADA || (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] == 0)){
+				    	i = hallar_posicion(n_simbolo, oct, notas, cantidad_notas);
+				    	printf("posicion: %lu\n", i);
+				    	if (i  == -1) continue;
+				    	if (notas[i] == NULL){
+				    		fprintf(stderr, "la nota de la posicion [%lu] es NULL \n", i);
+							continue;
+				    	}
+
+						if (!nota_finalizo(notas[i]))
+							nota_terminar(notas[i]);
+					}			
+				}
+			}//if canal
+
+		}
+	}
+    printf("Procesamiento finalizado.\n\n");
+    return true;
+}
+
+//DECODIFICACIÓN
+
+bool decodificar_formato(uint16_t valor, formato_t *formato){
+	/*Dado el valor recibido, guarda en el puntero formato el formato representado por el valor.
+	Si el valor es correcto devuelve true, de otra forma devuelve false*/
+	if(valor >= 0 && valor <= 2){
+		*formato = valor;
+		return true;
+	}
+	return false;
+}
 
 
-const char *codificar_formato(formato_t formato);
-
-const char *codificar_evento(evento_t evento);
-
-const char *codificar_nota(notas_t nota);
-
-
-uint8_t leer_uint8_t(FILE *f);
-
-uint16_t leer_uint16_big_endian(FILE *f);
-
-uint32_t leer_uint32_big_endian(FILE *f);
+bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud){	
+	if((valor & MSB_MASK_ON) == MSB_MASK_ON){
+		*evento = (valor & (~MSB_MASK_ON)) >> SHIFT_VALUE; 
+		*canal = (uint8_t)(valor << SHIFT_VALUE) >> SHIFT_VALUE;
+		*longitud = propiedades[*evento].longitud;
+		
+		return true;
+	}
+	return false;
+}
 
 
-bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint16_t *pulsos_negra);
+bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava){
+	/*Dado el valor recibido guarda en nota la nota representada por dicho valor y en el puntero octava
+	guarda la octava correspondiente. Si la nota es correcta devueve true, en caso contrario devuelve false*/
+	if(valor <= 127){
+		*nota = valor % 12;
+		*octava = (char)(valor / 12 - 1); //resto 1 porque los primeros 12 semitonos corresponden a la octava 0
+		return true;
+	}
+	return false;
+}
 
-bool leer_pista(FILE *f, uint32_t *tamagno);
-
-bool leer_tiempo(FILE *f, uint32_t *tiempo);
-
-bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t mensaje[]);
-
-void descartar_metaevento(FILE *f, uint8_t tamagno);
 
 
-#endif
+//CODIFICACIÓN
+
+const char *codificar_formato(formato_t formato){
+	return nombres_formatos[formato];
+}
+
+
+const char *codificar_evento(evento_t evento){
+	return propiedades[evento].tipo_evento;
+}
+
+
+const char *codificar_nota(notas_t nota){
+	return lista_notas_sostenido[nota];
+}
+
+
+
+//ENDIANNES
+
+uint8_t leer_uint8_t(FILE *f){
+	uint8_t palabra;
+	fread(&palabra, sizeof(uint8_t), 1, f);
+	return palabra;
+}
+
+
+uint16_t leer_uint16_big_endian(FILE *f){
+	uint8_t p[2];
+	fread(p, 1, 2, f);
+	uint16_t palabra = p[1] | p[0];
+	return palabra;
+}
+
+
+uint32_t leer_uint32_big_endian(FILE *f){
+	uint8_t p[4];
+	fread(p, 1, 4, f);				
+	uint32_t palabra = (p[0] << SHIFT_3_BYTES) | (p[1] << SHIFT_2_BYTES) | (p[2] << SHIFT_1_BYTE) | p[3];
+	return palabra;
+}
+
+
+//PROCESAMIENTO DE ARCHIVO
+
+bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint16_t *pulsos_negra){
+	uint32_t header = leer_uint32_big_endian(f);
+	uint32_t hsize = leer_uint32_big_endian(f);
+	if(header != HEADER_VALUE || hsize != 6) return false;
+
+	uint16_t fmt = leer_uint16_big_endian(f);
+	*numero_pistas = leer_uint16_big_endian(f);
+	*pulsos_negra = leer_uint16_big_endian(f);
+	return decodificar_formato(fmt, formato);
+}
+
+
+//PISTAS
+
+bool leer_pista(FILE *f, uint32_t *tamagno){
+	uint32_t track_id = leer_uint32_big_endian(f);
+	if (track_id != TRACK_ID_VALUE) return false;
+
+	*tamagno = leer_uint32_big_endian(f);
+	return true;
+}
+
+
+bool leer_tiempo(FILE *f, uint32_t *tiempo){
+	size_t i = 0;
+	uint32_t t_total = 0;
+
+	while(i < 4){
+		uint8_t byte = leer_uint8_t(f);
+		uint8_t t = byte & (~MSB_MASK_ON);
+		t_total = (t_total << (i * SHIFT_1_BYTE - i)) | t;
+		if ((byte & MSB_MASK_ON) == 0)
+			break;
+		i++;
+	}
+	if (i == 3 && (t_total & MSB_MAX_TIME_ON) == MSB_MAX_TIME_ON)
+		return false; //el tamaño del tiempo es 4 y su MSB está en 1
+	
+	*tiempo = t_total;
+	return true;
+}
+
+
+bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t mensaje[]){
+	uint8_t dato;
+	size_t i = 0;
+	fread(&dato, sizeof(uint8_t), 1, f);
+	if(!decodificar_evento(dato, evento, canal, longitud)){
+		mensaje[0] = dato;
+		i++;
+	}
+	while(i < *longitud ){
+		mensaje[i] = leer_uint8_t(f);
+		i++;
+	}
+	return true;
+}
+
+
+void descartar_metaevento(FILE *f, uint8_t tamagno){
+	fseek(f, tamagno, SEEK_CUR);
+}
