@@ -12,6 +12,7 @@ nota_t *crear_nota(notas_t simb, signed char oct, uint8_t i, double t0){
 	n->a = (float)i;
 	n->inicio = t0;
 	n->final = t0;
+	n->finalizada =  false;
 	if(!_obtener_frecuencia(n)){
 		free(n);
 		return NULL;
@@ -36,17 +37,34 @@ void imprimir_nota(nota_t *nota){
 bool nota_ya_existe(notas_t nombre, signed char oct, nota_t *notas[], size_t n, size_t *pos){
 	if (n == 0) return false;
 	for (size_t i = 0; i < n; i++){
-		if(notas[i] == NULL)
 		if (notas[i] != NULL && notas[i]->simbolo == nombre && notas[i]->octava == oct){
-			*pos = i;
-			return true;
+			if(!nota_finalizo(notas[i])){
+				*pos = i;
+				return true;
+			}
 		}
 	}
 	return false;
 }
 
+bool nota_finalizo(nota_t *nota){
+	return nota->finalizada;
+}
+
+void nota_terminar(nota_t *n){
+	n->finalizada = true;
+}
+
 void nota_borrar(nota_t *n){
 	free(n);
+}
+
+void vaciar_contenedor_notas(nota_t *notas[], size_t n){
+	for (size_t i = 0; i < n; i++){
+		if (notas[i] != NULL)
+			nota_borrar(notas[i]);
+	}
+	free(notas);
 }
 
 size_t hallar_posicion(notas_t nombre, signed char oct, nota_t *notas[], size_t n){
@@ -54,27 +72,11 @@ size_t hallar_posicion(notas_t nombre, signed char oct, nota_t *notas[], size_t 
 	size_t i = 0;
 	for (i = 0; i < n; i++){
 		if (notas[i] != NULL && nombre == notas[i]->simbolo && oct == notas[i]->octava)
-			return i;
+			if (!nota_finalizo(notas[i]))
+				return i;
+		if (notas[i] ==  NULL) return i;
 	}
 	return -1;
-}
-
-size_t posicion_nota_nueva(nota_t *notas[], size_t n){
-	for(size_t i = 0; i < n; i++){
-		if (notas[i] == NULL)
-			return i;
-	}
-	return 0;
-}
-
-void actualizar_lista(nota_t *notas[]){
-	for (size_t i = 0; i < MAX_NOTAS; i++){
-		if (notas[i] == NULL && notas[i+1] != NULL){
-			nota_t *aux = notas[i+1];
-			notas[i] = aux;
-			notas[i+1] = NULL;
-		}
-	}
 }
 
 static bool _obtener_frecuencia(nota_t *n){	
@@ -83,4 +85,5 @@ static bool _obtener_frecuencia(nota_t *n){
 	n->f = A4_FREC * pow(2, (n->octava - A4_OCT) + ((float)n->simbolo - A) / 12);
 	return true;
 }
+
 
