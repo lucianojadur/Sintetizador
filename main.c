@@ -2,11 +2,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "sintetizador.h"
+#include "contenedor_notas.h"
 #include "nota.h"
 #include "midi.h"
 #include "tramo.h"
 #include "wave.h"
-#include "_main.h"
+#include "main.h"
 
 
 int main(int argc, char const *argv[]){
@@ -30,13 +31,12 @@ int main(int argc, char const *argv[]){
 	    return 1;
 	}
 
-	nota_t **notas = malloc(sizeof(nota_t*) * max_cantidad_notas);
+	contenedor_t *notas = contenedor_notas_crear(max_cantidad_notas);
 	if (notas == NULL){
 		fprintf(stderr, "No se pudo abrir \"%s\"\n", args->midi);
 		liberar(NULL, NULL, tramo, fmidi, args);
 		return 1;
-	}for (size_t i = 0; i < max_cantidad_notas; i++)
-		notas[i] = NULL;	//Si no hago esto me tira conditional jump(...) en valgrind
+	}
 
 	FILE *fs = fopen(args->sint, "rt");
 	if (fs == NULL){
@@ -52,8 +52,9 @@ int main(int argc, char const *argv[]){
 		return -1;
 	}
 
-//PROCESAMIENTO DE MIDI Y CARGA DE NOTAS
-	if(!procesar_midi(fmidi, notas, max_cantidad_notas, cnl, pps)){
+//Inicio del proceso
+//LECTURA DE MIDI Y CARGA DE NOTAS
+	if(!procesar_midi(fmidi, notas, cnl, pps)){
 		fprintf(stderr, "No se pudo procesar el midi\n");
 		liberar(s, notas, tramo, fmidi, args);
 		return -1;
@@ -61,16 +62,16 @@ int main(int argc, char const *argv[]){
 	fclose(fmidi);
 
 //SÍNTESIS DE NOTAS
-	imprimir_data(s);
+	sintetizador_imprimir_data(s);
 
-	if (!sintetizar_pistas(tramo, s, notas, max_cantidad_notas, f_m)){
+	if (!sintetizador_sintetizar_pistas(tramo, s, notas, f_m)){
 		fprintf(stderr, "No se pudo sintetizar la pista\n");
 		liberar(s, notas, tramo, fmidi, args);
 		return -1;
 	}
 	printf("Se pudo sintetizar la pista\n");
-	vaciar_contenedor_notas(notas, max_cantidad_notas);
-	destruir_sintetizador(s);
+	contenedor_notas_limpiar(notas);
+	sintetizador_destruir(s);
 
 //ESCRITURA DEL WAVE
 	FILE *fw = crear_fichero(args->wave);
@@ -81,10 +82,58 @@ int main(int argc, char const *argv[]){
 			return -1;
 		}
 	}
-	printf("\n\n\n### Se pudo escribir el wave :D ###\n");	
+	printf("\n\n### Se pudo escribir el wave :D ###\n");	
 	liberar(NULL, NULL, tramo, fw, args);
 
 	return 0;
 }
 
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void uso(const char *arg){
+	fprintf(stderr, "Error. Ingrese al menos 3 pares de argumentos.\n");
+	fprintf(stderr, "Uso básico: %s -s <sintetizador.txt> -i <entrada.mid> -o <salida.wav>\n", arg);
+	fprintf(stderr, "Argumentos opcionales:\n\t-f <frecuencia de muestreo>\n\t-c <canal>\n\t-r <pulsos/segundo>\n\n");
+}
+
+argumentos_t *crear_args(){
+	argumentos_t *args = malloc(sizeof(argumentos_t));
+	args->canal = 0;
+	args->f_muestreo = 44100;
+	args->pulsos = 138; 
+	return args;
+}
+
+bool verificar_argumentos(int argc, const char *argv[], argumentos_t *args){
+	if(argc != 7 && argc != 9 && argc != 11 && argc != 13)
+		return false;
+	
+	for(size_t i = 1; i < argc; i++){
+		if(strcmp(argv[i], "-s") == 0){
+			strcpy(args->sint, argv[i+1]);
+		}
+		else if(strcmp(argv[i], "-i") == 0){
+			strcpy(args->midi, argv[i+1]);
+		}
+		else if(strcmp(argv[i], "-o") == 0){
+			strcpy(args->wave, argv[i+1]);
+		}
+		else if(strcmp(argv[i], "-c") == 0)
+			args->canal = atoi(argv[i+1]);
+		else if(strcmp(argv[i], "-f") == 0)
+			args->f_muestreo = atoi(argv[i+1]);
+		else if(strcmp(argv[i], "-r") == 0)
+			args->pulsos = atoi(argv[i+1]);
+	}
+	return true;
+}
+
+void liberar(synth_t *s, contenedor_t *c, tramo_t *t, FILE *fm, argumentos_t *args){
+	if (s != NULL) sintetizador_destruir(s);
+    if (t !=  NULL) tramo_destruir(t);
+   	if (fm != NULL) fclose(fm);
+   	if (c != NULL) contenedor_notas_limpiar(c);
+   	free(args);
+}
