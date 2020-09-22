@@ -1,4 +1,6 @@
 #include "midi.h"
+#include "contenedor_notas.h"
+#include "nota.h"
 
 const char * nombres_formatos[] = {
 	[PISTA_UNICA] = "Pista única",
@@ -33,14 +35,15 @@ const char * lista_notas_sostenido[] = {
 };
 
 
-bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int pps){
+bool procesar_midi(FILE *f, contenedor_t *notas, int cnl, int pps){
 	// LECTURA DEL ENCABEZADO:
 	formato_t formato;
 	uint16_t numero_pistas;
 	uint16_t pulsos_negra;
+//	size_t cantidad_notas = contenedor_obtener_max(notas);
 
 	if (! leer_encabezado(f, &formato, &numero_pistas, &pulsos_negra)) {
-		vaciar_contenedor_notas(notas, cantidad_notas);
+		contenedor_notas_limpiar(notas);
 	    fclose(f);
 	    return 1;
 	}
@@ -50,7 +53,7 @@ bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int
 	    // LECTURA ENCABEZADO DE LA PISTA:
 	    uint32_t tamagno_pista = 0;
 	    if (! leer_pista(f, &tamagno_pista)) {
-			vaciar_contenedor_notas(notas, cantidad_notas);
+			contenedor_notas_limpiar(notas);
 	        fclose(f);
 	        return 1;
 	    }
@@ -60,33 +63,31 @@ bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int
 		uint32_t tiempo = 0;
 		double inicio_nota = 0;
 		int longitud;
-		// ITERAMOS LOS EVENTOS:
+
 		while(1) {
 			uint32_t delta_tiempo;
 			leer_tiempo(f, &delta_tiempo);
 			tiempo += delta_tiempo;
 
-			// LECTURA DEL EVENTO:
 			uint8_t buffer[EVENTO_MAX_LONG];
 			if (! leer_evento(f, &evento, &canal, &longitud, buffer)) {
-				vaciar_contenedor_notas(notas, cantidad_notas);
+				contenedor_notas_limpiar(notas);
 				fclose(f);
 				return false;
 			}
-
-			// METAEVENTO:
 			if (evento == METAEVENTO && canal == 0xF) {
 				if(buffer[METAEVENTO_TIPO] == METAEVENTO_FIN_DE_PISTA) 
 					break;
 			    descartar_metaevento(f, buffer[METAEVENTO_LONGITUD]);
 			}
 
+
 			if (canal == cnl){
 				size_t i = 0;
 
-				while(notas[i] != NULL && i < MAX_NOTAS){
-					if (!nota_finalizo(notas[i]))
-						aumentar_duracion(notas[i], (double)delta_tiempo / pps);
+				while(contenedor_hallar_nota(notas, i) != NULL && i < MAX_NOTAS){
+					if (!nota_finalizo(contenedor_hallar_nota(notas, i)))
+						nota_aumentar_duracion(contenedor_hallar_nota(notas, i), (double)delta_tiempo / pps);
 					i++;
 				} 
 				if (evento == NOTA_ENCENDIDA || evento == NOTA_APAGADA) {   
@@ -97,34 +98,28 @@ bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int
 				        continue;
 				
 					if (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] != 0){
-						if (!nota_ya_existe(n_simbolo, oct, notas, cantidad_notas, &i)){
-		/*CREO LA NOTA*/	notas[i] = crear_nota(n_simbolo, oct, buffer[EVNOTA_VELOCIDAD], inicio_nota);
-						    if (notas[i] == NULL){
-						    	fprintf(stderr, "No se pudo guardar la nota de la posicion [%lu]\n", i);
-						    	continue;
+						if (!contenedor_nota_ya_existe(n_simbolo, oct, notas, &i)){
+		/*CREO LA NOTA*/	contenedor_agregar_nota(notas, nota_crear(n_simbolo, oct, buffer[EVNOTA_VELOCIDAD], inicio_nota), i);
+							if (contenedor_hallar_nota(notas, i) == NULL){
+								fprintf(stderr, "No se pudo guardar la nota de la posicion [%lu]\n", i);
+								continue;
 						    }
 					    }
-					    if (!nota_finalizo(notas[i]))
+					    if (!nota_finalizo(contenedor_hallar_nota(notas, i)))
 					    	continue;
 					}
 					else if (evento == NOTA_APAGADA || (evento == NOTA_ENCENDIDA && buffer[EVNOTA_VELOCIDAD] == 0)){
-				    	i = hallar_posicion(n_simbolo, oct, notas, cantidad_notas);
-				    	printf("posicion: %lu\n", i);
-				    	if (i  == -1) continue;
-				    	if (notas[i] == NULL){
-				    		fprintf(stderr, "la nota de la posicion [%lu] es NULL \n", i);
+				    	i = contenedor_hallar_posicion_nota(n_simbolo, oct, notas);
+				    	if (contenedor_hallar_nota(notas, i) == NULL)
 							continue;
-				    	}
-
-						if (!nota_finalizo(notas[i]))
-							nota_terminar(notas[i]);
+						if (!nota_finalizo(contenedor_hallar_nota(notas, i)))
+							nota_terminar(contenedor_hallar_nota(notas, i));
 					}			
 				}
-			}//if canal
+			} //if canal
 
 		}
 	}
-    printf("Procesamiento finalizado.\n\n");
     return true;
 }
 
