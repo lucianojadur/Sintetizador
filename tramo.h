@@ -16,14 +16,9 @@ Entre sus atributos se incluyen:
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
-#include "muestreo.h"
 
-typedef struct {
-    float *v;		
-    size_t n;		
-    double t0;		
-    int f_m;		
-}tramo_t;			
+
+typedef struct tramo tramo_t;
 
 
 
@@ -42,5 +37,17 @@ bool tramo_redimensionar(tramo_t *t, double tf);
 
 bool tramo_extender(tramo_t *destino, const tramo_t *extension);
 /*Suma los datos de extension a los de destino.*/
+
+void tramo_multiplicar_muestra(tramo_t * tramo, size_t i, float valor);
+/*multiplica una muestra por valor cuya posición es determinada por i (Esto hay que modificarlo ya que implica conocer la implementación del tda tramo)*/
+
+size_t tramo_obtener_tamanio(tramo_t *tramo);
+
+int tramo_obtener_f_muestreo(tramo_t *tramo);
+
+float tramo_hallar_max(tramo_t *tramo);
+
+float tramo_copiar_muestra(tramo_t *tramo, size_t i);
+
 
 #endif
