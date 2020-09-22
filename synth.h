@@ -23,75 +23,38 @@ TDA SINTETIZADOR
 #include <ctype.h>
 #include <math.h>
 #include <stdbool.h>
+#include "contenedor_notas.h"
 #include "nota.h"
 #include "tramo.h"
 
-#define MAX_HARM		10
+#define MAX_HARM			30
 #define MAX_KEYS_LENGTH		9
 #define PARAM_LINES_NUMBER	3
-#define HARM_STR_LENGTH		11
-#define FREC_INDEX		0
-#define AMP_INDEX		1
-#define MAX_FREC_DIGITS		1
-#define MAX_AMP_DIGITS		8
+#define HARM_STR_LENGTH		25
+#define FREC_INDEX			0
+#define AMP_INDEX			1
+#define MAX_FREC_DIGITS		9
+#define MAX_AMP_DIGITS		9
 #define PARAMS_LENGTH		25
-#define FUNCTIONS		12
+#define FUNCTIONS			12
 #define MAX_MOD_FUNC		14
 #define LINE_DELIMITER		" "
 
-typedef float (*accion_t)(double, float [3]);
 
-typedef enum {ATAQUE, SUSTAIN, CAIDA} intervalo_t;
-
-typedef enum {
-	CONSTANT,
-	LINEAR,
-	INVLINEAR,
-	SIN,
-	EXP,
-	INVEXP,
-	QUARTCOS,
-	QUARTSIN,
-	HALFCOS,
-	HALFSIN,
-	LOG,
-	INVLOG,
-	TRI,
-	PULSES
-}acciones_t;
-
-typedef struct {
-	char* clave;
-	accion_t accion;
-}funciones_t;
-
-typedef struct{
-	char clave[MAX_KEYS_LENGTH];
-	float instantes[3];
-}params_t;
-
-typedef struct{
-	size_t n;
-	params_t *data[3];
-	float armonicos[][2];
-}synth_t;
-
+typedef struct sintetizador synth_t;
 
 
 synth_t *sintetizador_crear(FILE *f);
 /*Crea un tda sintetizador dinámico inicializado con todos los valores indicados por el archivo apuntado por f*/
 
-params_t *obtener_informacion(char * linea);
-/*Almacena en una estructura el nombre de la función que modula y los parámetros temporales escritos en linea*/
+void sintetizador_imprimir_data(synth_t *s);
 
-void imprimir_data(synth_t *s);
-
-void destruir_sintetizador(synth_t *t);
+void sintetizador_destruir(synth_t *t);
 /*Libera toda la memoria pedida para crear el tda*/
 
-tramo_t *sintetizar_nota(nota_t *nota, synth_t *s, int f_m);
-/*Crea un tramo con los primeros 4 parámetros muestreado a una frecuencia de muestreo f_m 
-y lo sintetiza según los atributos del sintetizador s*/
+tramo_t *sintetizar_nota(nota_t *n, synth_t *s, int f_m);
+/*Crea un tramo con los primeros 4 parámetros muestreado a una f_m y lo sintetiza según los atributos del sintetizador s*/
 
+bool sintetizador_sintetizar_pistas(tramo_t *tramo, synth_t *s, contenedor_t *c, int f_m);
 
 #endif
