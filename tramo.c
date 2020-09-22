@@ -1,14 +1,24 @@
 #include "tramo.h"
+#include "muestreo.h"
+
+
+struct tramo{
+    float *v;		
+    size_t n;		
+    double t0;		
+    int f_m;		
+};			
 
 
 tramo_t *_tramo_crear(double t_inicial, double t_final, int f_muestreo){
-	tramo_t * tramo;
-	float * muestras;
-	if((tramo = malloc(sizeof(tramo_t))) == NULL) return NULL;
+	tramo_t * tramo = malloc(sizeof(tramo_t));
+	if(tramo == NULL) 
+		return NULL;
 
 	size_t cantidad_muestras = f_muestreo * (t_final - t_inicial);	
 
-	if((muestras = malloc(sizeof(float) * cantidad_muestras)) == NULL){
+	float * muestras = malloc(sizeof(float) * cantidad_muestras);
+	if(muestras == NULL){
 		free(tramo);
 		return NULL;
 	}
@@ -86,4 +96,29 @@ bool tramo_extender(tramo_t *destino, const tramo_t *extension){
 		destino->v[i+inicio_extension] += extension->v[i];
 
 	return true;
+}
+
+void tramo_multiplicar_muestra(tramo_t *tramo, size_t i, float valor){
+	tramo->v[i] *= valor;
+}
+
+size_t tramo_obtener_tamanio(tramo_t *tramo){
+	return tramo->n;
+}
+
+int tramo_obtener_f_muestreo(tramo_t *tramo){
+	return tramo->f_m;
+}
+
+float tramo_copiar_muestra(tramo_t *tramo, size_t i){
+	return tramo->v[i];
+}
+
+float tramo_hallar_max(tramo_t *tramo){
+	float max = tramo->v[0];
+	for (size_t i = 1; i < tramo->n; i++){
+		if (tramo->v[i] > max)
+			max = tramo->v[i];
+	}
+	return max;
 }
