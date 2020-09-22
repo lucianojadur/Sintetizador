@@ -11,6 +11,7 @@ de cada pista del archivo segmentada en: información de pista, intervalos de ti
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "contenedor_notas.h"
 #include "nota.h"
 
 #define MSB_MASK_ON		0x80
@@ -51,46 +52,9 @@ typedef enum{
 }evento_t;
 
 
-typedef struct{
-	evento_t evento;
-	char * tipo_evento;
-	int longitud;
-}prop_evento_t;
-
-
-
-bool procesar_midi(FILE *f, nota_t *notas[], size_t cantidad_notas, int cnl, int pps);
-
-bool decodificar_formato(uint16_t valor, formato_t *formato);
-
-bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud);
-
-bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava);
-
-
-const char *codificar_formato(formato_t formato);
-
-const char *codificar_evento(evento_t evento);
-
-const char *codificar_nota(notas_t nota);
-
-
-uint8_t leer_uint8_t(FILE *f);
-
-uint16_t leer_uint16_big_endian(FILE *f);
-
-uint32_t leer_uint32_big_endian(FILE *f);
-
-
-bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint16_t *pulsos_negra);
-
-bool leer_pista(FILE *f, uint32_t *tamagno);
-
-bool leer_tiempo(FILE *f, uint32_t *tiempo);
-
-bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t mensaje[]);
-
-void descartar_metaevento(FILE *f, uint8_t tamagno);
+bool procesar_midi(FILE *f, contenedor_t *notas, int cnl, int pps);
+/*Lee un archivo midi y guarda todas las notas de un canal determinado por cnl con sus correspondientes atributos
+en notas. Los tiempos de cada nota son convertidos de pulsos por negra a segundos según el valor de pps*/
 
 
 #endif
