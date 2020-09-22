@@ -1,9 +1,20 @@
 #include "nota.h"
 
 
+struct nota{
+	notas_t simbolo;
+	signed char octava;
+	float f;
+	float a;
+	double inicio;
+	double final;
+	bool finalizada;
+};
+
+
 static bool _obtener_frecuencia(nota_t *n);
 
-nota_t *crear_nota(notas_t simb, signed char oct, uint8_t i, double t0){
+nota_t * nota_crear(notas_t simb, signed char oct, uint8_t i, double t0){
 	nota_t *n = malloc(sizeof(nota_t));
 	if (n == NULL)
 		return NULL;
@@ -20,35 +31,38 @@ nota_t *crear_nota(notas_t simb, signed char oct, uint8_t i, double t0){
 	return n;
 }
 
-bool aumentar_duracion(nota_t *n, float t){
+bool nota_aumentar_duracion(nota_t *n, float t){
 	if (n == NULL) return false;
 	n->final += t;
 	return true;
 }
 
-void imprimir_nota(nota_t *nota){
-	printf("8va: %d, ", nota->octava);
-	printf("f: %.2f, ", nota->f);
-	printf("i: %.2f, ", nota->a);
-	printf("t0: %.2f, ", nota->inicio);
-	printf("tf: %.2f\n", nota->final);
+notas_t nota_obtener_nombre(nota_t *n){
+	return n->simbolo;
+}	
+
+signed char nota_obtener_octava(nota_t *n){
+	return n->octava;
 }
 
-bool nota_ya_existe(notas_t nombre, signed char oct, nota_t *notas[], size_t n, size_t *pos){
-	if (n == 0) return false;
-	for (size_t i = 0; i < n; i++){
-		if (notas[i] != NULL && notas[i]->simbolo == nombre && notas[i]->octava == oct){
-			if(!nota_finalizo(notas[i])){
-				*pos = i;
-				return true;
-			}
-		}
-	}
-	return false;
+double nota_obtener_inicio(nota_t *n){
+	return n->inicio;
 }
 
-bool nota_finalizo(nota_t *nota){
-	return nota->finalizada;
+double nota_obtener_final(nota_t *n){
+	return n->final;
+}
+
+double nota_obtener_duracion(nota_t *n){
+	return n->final - n->inicio;
+}
+
+double nota_obtener_frecuencia(nota_t *n){
+	return n->f;
+}
+
+double nota_obtener_amplitud(nota_t *n){
+	return n->a;
 }
 
 void nota_terminar(nota_t *n){
@@ -59,25 +73,18 @@ void nota_borrar(nota_t *n){
 	free(n);
 }
 
-void vaciar_contenedor_notas(nota_t *notas[], size_t n){
-	for (size_t i = 0; i < n; i++){
-		if (notas[i] != NULL)
-			nota_borrar(notas[i]);
-	}
-	free(notas);
+bool nota_finalizo(nota_t *nota){
+	return nota->finalizada;
 }
 
-size_t hallar_posicion(notas_t nombre, signed char oct, nota_t *notas[], size_t n){
-	if (n == 0) return 0;
-	size_t i = 0;
-	for (i = 0; i < n; i++){
-		if (notas[i] != NULL && nombre == notas[i]->simbolo && oct == notas[i]->octava)
-			if (!nota_finalizo(notas[i]))
-				return i;
-		if (notas[i] ==  NULL) return i;
-	}
-	return -1;
+void nota_imprimir(nota_t *nota){
+	printf("8va: %d, ", nota->octava);
+	printf("f: %.2f, ", nota->f);
+	printf("i: %.2f, ", nota->a);
+	printf("t0: %.2f, ", nota->inicio);
+	printf("tf: %.2f\n", nota->final);
 }
+
 
 static bool _obtener_frecuencia(nota_t *n){	
 	if((n->octava == 0 && n->simbolo < A) || (n->octava == 8 && n->simbolo != C) || n->octava > 8)
@@ -85,5 +92,3 @@ static bool _obtener_frecuencia(nota_t *n){
 	n->f = A4_FREC * pow(2, (n->octava - A4_OCT) + ((float)n->simbolo - A) / 12);
 	return true;
 }
-
-
