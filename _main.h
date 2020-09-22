@@ -1,18 +1,14 @@
-#ifndef MAIN
-#define MAIN
+#ifndef MAIN_H
+#define MAIN_H
 
 #include "sintetizador.h"
+#include "contenedor_notas.h"
 #include "nota.h"
 #include "midi.h"
 #include "tramo.h"
 #include "wave.h"
 
-#define MAX_CHARS_FILE 40
-#define METAEVENTO_FIN_DE_PISTA 0x2F
-#define EVENTO_MAX_LONG 10
-
-enum {EVNOTA_NOTA, EVNOTA_VELOCIDAD};
-enum {METAEVENTO_TIPO, METAEVENTO_LONGITUD};
+#define MAX_CHARS_FILE	80
 
 typedef struct{
 	char sint[MAX_CHARS_FILE];
@@ -30,8 +26,6 @@ bool verificar_argumentos(int argc, const char *argv[], argumentos_t *args);
 
 void uso(const char *arg);
 
-void liberar_todo(synth_t *s, nota_t *n, tramo_t *t, FILE *fm, argumentos_t *args);
-
-void borrar_argumentos(argumentos_t *args);
+void liberar(synth_t *s, contenedor_t *c, tramo_t *t, FILE *fm, argumentos_t *args);
 
 #endif
