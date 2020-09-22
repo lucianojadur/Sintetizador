@@ -34,6 +34,44 @@ const char * lista_notas_sostenido[] = {
 	[B] = "B",
 };
 
+typedef struct {
+	evento_t evento;
+	char * tipo_evento;
+	int longitud;
+}propiedades_t;
+
+static bool decodificar_formato(uint16_t valor, formato_t *formato);
+
+static bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud);
+
+static bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava);
+
+
+static const char *codificar_formato(formato_t formato);
+
+static const char *codificar_evento(evento_t evento);
+
+static const char *codificar_nota(notas_t nota);
+
+
+static uint8_t leer_uint8_t(FILE *f);
+
+static uint16_t leer_uint16_big_endian(FILE *f);
+
+static uint32_t leer_uint32_big_endian(FILE *f);
+
+
+static bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint16_t *pulsos_negra);
+
+static bool leer_pista(FILE *f, uint32_t *tamagno);
+
+static bool leer_tiempo(FILE *f, uint32_t *tiempo);
+
+static bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t mensaje[]);
+
+static void descartar_metaevento(FILE *f, uint8_t tamagno);
+
+
 
 bool procesar_midi(FILE *f, contenedor_t *notas, int cnl, int pps){
 	// LECTURA DEL ENCABEZADO:
@@ -123,9 +161,10 @@ bool procesar_midi(FILE *f, contenedor_t *notas, int cnl, int pps){
     return true;
 }
 
+
 //DECODIFICACIÓN
 
-bool decodificar_formato(uint16_t valor, formato_t *formato){
+static bool decodificar_formato(uint16_t valor, formato_t *formato){
 	/*Dado el valor recibido, guarda en el puntero formato el formato representado por el valor.
 	Si el valor es correcto devuelve true, de otra forma devuelve false*/
 	if(valor >= 0 && valor <= 2){
@@ -136,7 +175,7 @@ bool decodificar_formato(uint16_t valor, formato_t *formato){
 }
 
 
-bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud){	
+static bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longitud){	
 	if((valor & MSB_MASK_ON) == MSB_MASK_ON){
 		*evento = (valor & (~MSB_MASK_ON)) >> SHIFT_VALUE; 
 		*canal = (uint8_t)(valor << SHIFT_VALUE) >> SHIFT_VALUE;
@@ -148,7 +187,7 @@ bool decodificar_evento(uint8_t valor, evento_t *evento, char *canal, int *longi
 }
 
 
-bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava){
+static bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava){
 	/*Dado el valor recibido guarda en nota la nota representada por dicho valor y en el puntero octava
 	guarda la octava correspondiente. Si la nota es correcta devueve true, en caso contrario devuelve false*/
 	if(valor <= 127){
@@ -163,17 +202,17 @@ bool decodificar_nota(uint8_t valor, notas_t *nota, signed char *octava){
 
 //CODIFICACIÓN
 
-const char *codificar_formato(formato_t formato){
+static const char *codificar_formato(formato_t formato){
 	return nombres_formatos[formato];
 }
 
 
-const char *codificar_evento(evento_t evento){
+static const char *codificar_evento(evento_t evento){
 	return propiedades[evento].tipo_evento;
 }
 
 
-const char *codificar_nota(notas_t nota){
+static const char *codificar_nota(notas_t nota){
 	return lista_notas_sostenido[nota];
 }
 
@@ -181,22 +220,20 @@ const char *codificar_nota(notas_t nota){
 
 //ENDIANNES
 
-uint8_t leer_uint8_t(FILE *f){
+static uint8_t leer_uint8_t(FILE *f){
 	uint8_t palabra;
 	fread(&palabra, sizeof(uint8_t), 1, f);
 	return palabra;
 }
 
-
-uint16_t leer_uint16_big_endian(FILE *f){
+static uint16_t leer_uint16_big_endian(FILE *f){
 	uint8_t p[2];
 	fread(p, 1, 2, f);
 	uint16_t palabra = p[1] | p[0];
 	return palabra;
 }
 
-
-uint32_t leer_uint32_big_endian(FILE *f){
+static uint32_t leer_uint32_big_endian(FILE *f){
 	uint8_t p[4];
 	fread(p, 1, 4, f);				
 	uint32_t palabra = (p[0] << SHIFT_3_BYTES) | (p[1] << SHIFT_2_BYTES) | (p[2] << SHIFT_1_BYTE) | p[3];
@@ -206,7 +243,7 @@ uint32_t leer_uint32_big_endian(FILE *f){
 
 //PROCESAMIENTO DE ARCHIVO
 
-bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint16_t *pulsos_negra){
+static bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint16_t *pulsos_negra){
 	uint32_t header = leer_uint32_big_endian(f);
 	uint32_t hsize = leer_uint32_big_endian(f);
 	if(header != HEADER_VALUE || hsize != 6) return false;
@@ -220,7 +257,7 @@ bool leer_encabezado(FILE *f, formato_t *formato, uint16_t *numero_pistas, uint1
 
 //PISTAS
 
-bool leer_pista(FILE *f, uint32_t *tamagno){
+static bool leer_pista(FILE *f, uint32_t *tamagno){
 	uint32_t track_id = leer_uint32_big_endian(f);
 	if (track_id != TRACK_ID_VALUE) return false;
 
@@ -228,8 +265,7 @@ bool leer_pista(FILE *f, uint32_t *tamagno){
 	return true;
 }
 
-
-bool leer_tiempo(FILE *f, uint32_t *tiempo){
+static bool leer_tiempo(FILE *f, uint32_t *tiempo){
 	size_t i = 0;
 	uint32_t t_total = 0;
 
@@ -248,8 +284,7 @@ bool leer_tiempo(FILE *f, uint32_t *tiempo){
 	return true;
 }
 
-
-bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t mensaje[]){
+static bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t mensaje[]){
 	uint8_t dato;
 	size_t i = 0;
 	fread(&dato, sizeof(uint8_t), 1, f);
@@ -264,7 +299,6 @@ bool leer_evento(FILE *f, evento_t *evento, char *canal, int *longitud, uint8_t 
 	return true;
 }
 
-
-void descartar_metaevento(FILE *f, uint8_t tamagno){
+static void descartar_metaevento(FILE *f, uint8_t tamagno){
 	fseek(f, tamagno, SEEK_CUR);
 }
