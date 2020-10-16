@@ -10,16 +10,16 @@ que facilite su mantenibilidad y que logre dividirlo en distintos niveles de abs
 
 Implementado en C (std = ISO C99), módulos compilados con Makefile.
 //
-
+<main>
 EJECUCIÓN:
+<>
+./sintetizador -s sintetizador -i entrada -o salida [-f frecuencia_muestreo -c canal -r pps]
 
-./sintetizador -s <sintetizador> -i <entrada> -o <salida> [-f <frecuencia_muestreo> -c <canal> -r <pps>]
+    <sintetizador> : archivo de texto con los parámetros correspondientes al timbre a emular
 
-<sintetizador> : archivo de texto con los parámetros correspondientes al timbre a emular
+    <entrada> : archivo MIDI (extensión .mid o .midi)
 
-<entrada> : archivo MIDI (extensión .mid o .midi)
-
-<salida> : archivo WAVE generado por el programa
+    <salida> : archivo WAVE generado por el programa
 
 
 [Argumentos opcionales]:
