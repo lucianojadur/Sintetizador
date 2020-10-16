@@ -12,13 +12,20 @@ Implementado en C (std = ISO C99), módulos compilados con Makefile.
 //
 
 EJECUCIÓN:
+
 ./sintetizador -s <sintetizador> -i <entrada> -o <salida> [-f <frecuencia_muestreo> -c <canal> -r <pps>]
 
 <sintetizador> : archivo de texto con los parámetros correspondientes al timbre a emular
+
 <entrada> : archivo MIDI (extensión .mid o .midi)
+
 <salida> : archivo WAVE generado por el programa
 
+
 [Argumentos opcionales]:
+
     <frecuencia_muestreo> : número natural. El valor por omision es 44 kHz 
+
     <canal> : canal del archivo MIDI a sintetizar (en gral es un canal por arreglo de instrumento). El valor por omisión es 0
+
     <pps> : pulsos por segundo a convertir. El valor por omisión es 130.
