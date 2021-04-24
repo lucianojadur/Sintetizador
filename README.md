@@ -1,5 +1,7 @@
-//Sintetizador
 //
+Sintetizador
+//
+
 TP final de Algoritmos y Programación I (95.11) cátedra Essaya - Facultad de Ingeniería (UBA).
 Consiste en un programa que crea un archivo de sonido en formato WAVE (con especificaciones a detallar) a partir de un archivo MIDI ingresado por 
 el stream de entrada. La síntesis de audio se genera para un único canal, a partir de todas las pistas grabadas sobre tal, es decir, sintetiza sólo el sonido
@@ -10,16 +12,17 @@ que facilite su mantenibilidad y que logre dividirlo en distintos niveles de abs
 
 Implementado en C (std = ISO C99), módulos compilados con Makefile.
 //
-<main>
-EJECUCIÓN:
-<>
-./sintetizador -s sintetizador -i entrada -o salida [-f frecuencia_muestreo -c canal -r pps]
 
-    <sintetizador> : archivo de texto con los parámetros correspondientes al timbre a emular
 
-    <entrada> : archivo MIDI (extensión .mid o .midi)
+EJECUCIÓN (línea de comandos Shell-Linux):
+    
+    ./sintetizador -s sintetizador -i entrada -o salida [-f frecuencia_muestreo -c canal -r pps]
 
-    <salida> : archivo WAVE generado por el programa
+        <sintetizador> : archivo de texto con los parámetros correspondientes al timbre a emular
+
+        <entrada> : archivo MIDI (extensión .mid o .midi)
+
+        <salida> : archivo WAVE generado por el programa
 
 
 [Argumentos opcionales]:
